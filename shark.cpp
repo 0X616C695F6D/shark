@@ -9,6 +9,12 @@
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <iomanip>
+#include <string>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <memory>
 
 #define BUFFER_SIZE 65536
 #define MAX_CONNS 5
@@ -23,6 +29,8 @@ class Connection {
 		unsigned short dest_port;
 		string protocol;
 		int packet_count;
+		unique_ptr<ofstream> payload_file;
+		string filename;
 
 
 	Connection()
@@ -32,10 +40,64 @@ class Connection {
 	Connection(const string &src_ip, const string &dest_ip, unsigned short src_port,
 			unsigned short dest_port, const string &protocol)
 			: src_ip(src_ip), dest_ip(dest_ip), src_port(src_port),
-			dest_port(dest_port), protocol(protocol), packet_count(1) {}
+			dest_port(dest_port), protocol(protocol), packet_count(1) {
+				filename = src_ip + ":" + to_string(src_port) +
+					"_" + dest_ip + ":" + to_string(dest_port) + ".txt";
+
+
+				payload_file = make_unique<ofstream>(filename, ios::app);
+				if (payload_file && payload_file->is_open()) {
+					(*payload_file) << "Connection Details:\n"
+							 << "Source: " << src_ip << ":" << src_port << "\n"
+							 << "Dest: " << dest_ip << ":" << dest_port << "\n"
+							 << "Protocol: " << protocol << "\n"
+							 << "=== Payload Data ===\n\n";
+			}
+	}
+
+	Connection(Connection&& other) noexcept
+		: src_ip(move(other.src_ip)),
+		  dest_ip(move(other.dest_ip)),
+		  src_port(move(other.src_port)),
+		  dest_port(move(other.dest_port)),
+		  protocol(move(other.protocol)),
+		  packet_count(move(other.packet_count)),
+		  payload_file(move(other.payload_file)),
+		  filename(move(other.filename)) {}
+
+	Connection& operator=(Connection&& other) noexcept {
+		if (this != &other) {
+			src_ip = move(other.src_ip);
+			src_port = move(other.src_port);
+			dest_ip = move(other.dest_ip);
+			dest_port = move(other.dest_port);
+			protocol = move(other.protocol);
+			packet_count = move(other.packet_count);
+			payload_file = move(other.payload_file);
+			filename = move(other.filename);
+		}
+		return *this;
+	}
+
+	Connection(const Connection&) = delete;
+	Connection& operator=(const Connection&) = delete;
+
+	~Connection() = default;
 
 	void increment_packet_count() {
 		packet_count++;
+	}
+
+	void store_payload(const char *buffer, size_t data_size, size_t offset) {
+		if (!payload_file || !payload_file->is_open()) return;
+
+		*payload_file << "<--- Packet" << packet_count << " ---\n";
+		for (size_t i = offset; i < data_size; i++) {
+			unsigned char c = buffer[i];
+			*payload_file << (std::isprint(c) ? static_cast<char>(c) : '.');
+		}
+		*payload_file << "\n\n";
+		payload_file->flush();
 	}
 
 	void print_stats(int index) const {
@@ -70,12 +132,23 @@ string generate_conn_key(const string &src_ip, const string &dest_ip,
 
 void add_or_update_conn(const string &src_ip, const string &dest_ip,
 		unsigned short src_port, unsigned short dest_port,
-		const string &protocol) {
+		const string &protocol, const char* buffer, size_t data_size) {
 	string key = generate_conn_key(src_ip, dest_ip, src_port, dest_port);
+
+	struct iphdr *ip_header = (struct iphdr *)buffer;
+	struct tcphdr *tcp_header = (struct tcphdr *)
+		(buffer + (ip_header->ihl * 4));
+
+	size_t tcp_header_size = tcp_header->doff * 4;
+	size_t ip_header_size = ip_header->ihl * 4;
+	size_t offset = ip_header_size + tcp_header_size;
+
 	if (connections.find(key) != connections.end()) {
 		connections[key].increment_packet_count();
+		connections[key].store_payload(buffer, data_size, offset);
 	} else if (connections.size() < MAX_CONNS) {
 		connections[key] = Connection(src_ip, dest_ip, src_port, dest_port, protocol);
+		connections[key].store_payload(buffer, data_size, offset);
 	}
 }
 
@@ -85,6 +158,39 @@ void print_statistics() {
 	for (const auto &pair : connections) {
 		pair.second.print_stats(index++);
 	}
+
+}
+
+void print_payload(const char *buffer, size_t data_size) {
+	std::cout << "Offset    Hexadecimal                         " <<
+				 "               ASCII\n";
+	std::cout << "---------------------------------------------"  <<
+		         "---------------------------------\n";
+
+	for (size_t i = 0; i < data_size;  i += 16) {
+		cout << setw(8) << setfill('0') << hex << i << "  ";
+
+		for (size_t j = 0; j < 16; j++) {
+			if (i + j < data_size) {
+				cout << setw(2) << setfill('0') << hex <<
+					(static_cast<unsigned>(buffer[i + j]) & 0xFF) << " ";
+			} else {
+				cout << "   ";
+			}
+			if (j == 7) cout << " ";
+		}
+
+        std::cout << " |";
+        for (size_t j = 0; j < 16; j++) {
+            if (i + j < data_size) {
+                unsigned char c = buffer[i + j];
+                std::cout << (std::isprint(c) ? static_cast<char>(c) : '.');
+            }
+        }
+        std::cout << "|\n";
+	}
+	cout << dec;
+	cout << "\n";
 }
 
 int main() {
@@ -111,6 +217,8 @@ int main() {
 			continue;
 		}
 
+		print_payload(buffer, data_size);
+
 		struct iphdr *ip_header = (struct iphdr *)buffer;
 		char src_ip[INET_ADDRSTRLEN], dest_ip[INET_ADDRSTRLEN];
 
@@ -124,7 +232,8 @@ int main() {
             unsigned short dest_port = ntohs(tcp_header->dest);
 
             string protocol = get_protocol(dest_port);
-            add_or_update_conn(src_ip, dest_ip, src_port, dest_port, protocol);
+            add_or_update_conn(src_ip, dest_ip, src_port, dest_port, protocol,
+					buffer, data_size);
         }
 	}
 
@@ -132,3 +241,4 @@ int main() {
 	close(sockfd);
 	return 0;
 }
+
