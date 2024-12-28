@@ -11,7 +11,6 @@ Project
   create a heuristic per connection stating its maliciousness or normality
 
 Tasks
-+ Collect each connections payload and save to a file or another data structure
 + Fine-tine an LLM on payload data from connections
 	+ Take the simple case of HTTP first, telnet, nc, etc. Not encrypted.
 + Train LLM to determine 'malicious' traffic, or traffic out of the norm
@@ -20,3 +19,5 @@ Done
 + Create a connections object
 + Track individual connection headers: IP, TCP, protocol and packet count
 + Print simple statistics of each connection
++ TCPDump for incoming packets: Offset, HEX and ASCII values
++ Collect each connections payload and save to a file or another data structure
