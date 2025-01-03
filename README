@@ -14,6 +14,7 @@ Tasks
 + Fine-tine an LLM on payload data from connections
 	+ Take the simple case of HTTP first, telnet, nc, etc. Not encrypted.
 + Train LLM to determine 'malicious' traffic, or traffic out of the norm
++ Some GUI that shows node to node connections
 
 Done
 + Create a connections object
