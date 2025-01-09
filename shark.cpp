@@ -239,7 +239,7 @@ int main(int argc, char *argv[]) {
 		if (arg == "-h" || arg == "--help") {
 			cout << "Usage: " << argv[0] << " [options]\n";
 			cout << " -d, --dump" << "    Print TCP information\n";
-			cout << " -r, --json" << "    Write connections to JSON\n";
+			cout << " -j, --json" << "    Write connections to JSON\n";
 			cout << " -h, --help" << "    Print this\n";
 			return 0;
 		}
