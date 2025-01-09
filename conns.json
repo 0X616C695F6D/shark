@@ -1,0 +1,82 @@
+[
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 46920,
+        "packet_count": 1,
+        "protocol": "TCP",
+        "src_ip": "34.107.221.82",
+        "src_port": 80
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 49200,
+        "packet_count": 1,
+        "protocol": "TCP",
+        "src_ip": "34.107.243.93",
+        "src_port": 443
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 37172,
+        "packet_count": 1,
+        "protocol": "TCP",
+        "src_ip": "138.201.254.111",
+        "src_port": 443
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 43852,
+        "packet_count": 1,
+        "protocol": "TCP",
+        "src_ip": "108.139.15.48",
+        "src_port": 443
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 55854,
+        "packet_count": 1,
+        "protocol": "TCP",
+        "src_ip": "52.37.200.205",
+        "src_port": 443
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 53784,
+        "packet_count": 7,
+        "protocol": "TCP",
+        "src_ip": "35.164.169.204",
+        "src_port": 443
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 58980,
+        "packet_count": 14,
+        "protocol": "TCP",
+        "src_ip": "52.35.219.238",
+        "src_port": 443
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 43078,
+        "packet_count": 3,
+        "protocol": "TCP",
+        "src_ip": "172.64.155.209",
+        "src_port": 443
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 36938,
+        "packet_count": 103,
+        "protocol": "TCP",
+        "src_ip": "52.223.241.23",
+        "src_port": 443
+    },
+    {
+        "dest_ip": "10.96.0.113",
+        "dest_port": 34588,
+        "packet_count": 5268,
+        "protocol": "TCP",
+        "src_ip": "99.181.100.141",
+        "src_port": 443
+    }
+]

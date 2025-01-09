@@ -15,11 +15,13 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include "json.hpp"
 
 #define BUFFER_SIZE 65536
 #define MAX_CONNS 10
 
 using namespace std;
+using json = nlohmann::json;
 
 class Connection {
 	public:
@@ -107,6 +109,17 @@ class Connection {
 			 << "  Protocol: " << protocol << "\n"
 			 << "  Packet Count: " << packet_count << "\n\n";
 	}
+
+	json to_json() const {
+		return {
+			{"src_ip", src_ip},
+			{"src_port", src_port},
+			{"dest_ip", dest_ip},
+			{"dest_port", dest_port},
+			{"protocol", protocol},
+			{"packet_count", packet_count}
+		};
+	}
 };
 
 unordered_map<string, Connection> connections;
@@ -166,6 +179,22 @@ void print_statistics() {
 
 }
 
+void write_json() {
+    json connection_list = json::array();
+
+    for (const auto& [key, connection] : connections) {
+        connection_list.push_back(connection.to_json());
+    }
+
+	ofstream out_file("conns.json");
+	if (out_file.is_open()) {
+		out_file << connection_list.dump(4) << endl;
+		out_file.close();
+	} else {
+		cerr << "Failed to write json file"  << endl;
+	}
+}
+
 void print_payload(const char *buffer, size_t data_size) {
 	std::cout << "Offset    Hexadecimal                         " <<
 				 "               ASCII\n";
@@ -203,16 +232,22 @@ int main(int argc, char *argv[]) {
 	char buffer[BUFFER_SIZE];
 
 	bool dump_flag = false;
+	bool json_flag = false;
+
 	for (int i = 1; i < argc; i++) {
 		string arg = argv[i];
 		if (arg == "-h" || arg == "--help") {
 			cout << "Usage: " << argv[0] << " [options]\n";
 			cout << " -d, --dump" << "    Print TCP information\n";
+			cout << " -r, --json" << "    Write connections to JSON\n";
 			cout << " -h, --help" << "    Print this\n";
 			return 0;
 		}
 		else if (arg == "-d" || arg == "--dump") {
 			dump_flag = true;
+		}
+		else if (arg == "-j" || arg == "--json" || arg == "--JSON") {
+			json_flag = true;
 		}
 	}
 
@@ -256,6 +291,7 @@ int main(int argc, char *argv[]) {
         }
 	}
 
+	if (json_flag) { write_json(); }
 	print_statistics();
 	close(sockfd);
 	return 0;
