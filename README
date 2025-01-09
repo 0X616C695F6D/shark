@@ -9,7 +9,7 @@ Project
   these connections: IP, TCP headers and its payload
 
 Tasks
-+ Log-format write to disk of all connections
++
 
 Done
 + Create a connections object
@@ -18,3 +18,4 @@ Done
 + TCPDump for incoming packets: Offset, HEX and ASCII values
 + Collect each connections payload and save to a file or another data structure
 + Track bipartite connections A <-> B
++ Log-format write to disk of all connections
