@@ -17,7 +17,7 @@
 #include <memory>
 
 #define BUFFER_SIZE 65536
-#define MAX_CONNS 5
+#define MAX_CONNS 10
 
 using namespace std;
 
@@ -102,10 +102,10 @@ class Connection {
 
 	void print_stats(int index) const {
 		cout << "Connection " << index + 1 << ":\n"
-			 << " Source: " << src_ip << ":" << src_port << "\n"
-			 << " Destination: " << dest_ip << ":" << dest_port << "\n"
-			 << " Protocol: " << protocol << "\n"
-			 << " Packet Count: " << packet_count << "\n\n";
+			 << "  Source: " << src_ip << ":" << src_port << "\n"
+			 << "  Destination: " << dest_ip << ":" << dest_port << "\n"
+			 << "  Protocol: " << protocol << "\n"
+			 << "  Packet Count: " << packet_count << "\n\n";
 	}
 };
 
@@ -126,8 +126,13 @@ const string get_protocol(unsigned short dest_port){
 
 string generate_conn_key(const string &src_ip, const string &dest_ip,
 		unsigned short src_port, unsigned short dest_port) {
-	return src_ip  + ":" + to_string(src_port) + "->" +
-	       dest_ip + ":" + to_string(dest_port);
+	stringstream key;
+	if (src_ip < dest_ip || (src_ip == dest_ip && src_port < dest_port)) {
+		key << src_ip << ":" << src_port << "_" << dest_ip << ":" << dest_port;
+	} else {
+		key << dest_ip << ":" << dest_port << "_" << src_ip << ":" << src_port;
+	}
+	return key.str();
 }
 
 void add_or_update_conn(const string &src_ip, const string &dest_ip,
@@ -153,7 +158,7 @@ void add_or_update_conn(const string &src_ip, const string &dest_ip,
 }
 
 void print_statistics() {
-	cout << "===Connection Statistics===\n";
+	// cout << "===Connection Statistics===\n";
 	int index = 0;
 	for (const auto &pair : connections) {
 		pair.second.print_stats(index++);
@@ -193,9 +198,23 @@ void print_payload(const char *buffer, size_t data_size) {
 	cout << "\n";
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 	int sockfd;
 	char buffer[BUFFER_SIZE];
+
+	bool dump_flag = false;
+	for (int i = 1; i < argc; i++) {
+		string arg = argv[i];
+		if (arg == "-h" || arg == "--help") {
+			cout << "Usage: " << argv[0] << " [options]\n";
+			cout << " -d, --dump" << "    Print TCP information\n";
+			cout << " -h, --help" << "    Print this\n";
+			return 0;
+		}
+		else if (arg == "-d" || arg == "--dump") {
+			dump_flag = true;
+		}
+	}
 
 	sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
 	if (sockfd < 0) {
@@ -203,7 +222,7 @@ int main() {
 		return 1;
 	}
 
-	cout << "===Socket created===\n";
+	// cout << "===Socket created===\n";
 	signal(SIGINT, handle_signal);
 
 	while (running && connections.size() < MAX_CONNS) {
@@ -217,7 +236,7 @@ int main() {
 			continue;
 		}
 
-		print_payload(buffer, data_size);
+		if (dump_flag) { print_payload(buffer, data_size); }
 
 		struct iphdr *ip_header = (struct iphdr *)buffer;
 		char src_ip[INET_ADDRSTRLEN], dest_ip[INET_ADDRSTRLEN];
