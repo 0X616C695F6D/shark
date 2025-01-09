@@ -8,13 +8,12 @@ Project
 + Similar to wireshark, I want to track individual connections and headers of
   these connections: IP, TCP headers and its payload
 + After tracking connections, build a profile for each individual connection and
-  create a heuristic per connection stating its maliciousness or normality
+  create a heuristic per connection
 
 Tasks
-+ Fine-tine an LLM on payload data from connections
-	+ Take the simple case of HTTP first, telnet, nc, etc. Not encrypted.
-+ Train LLM to determine 'malicious' traffic, or traffic out of the norm
-+ Log format that shows node-to-node connections
++ Track bipartite connections
++ Improve output screen when cancelling the sniffer
++ Log-format write to disk of all connections
 
 Done
 + Create a connections object
