@@ -15,13 +15,24 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <chrono>
 #include "json.hpp"
 
 #define BUFFER_SIZE 65536
-#define MAX_CONNS 10
+#define MAX_CONNS 5
 
 using namespace std;
 using json = nlohmann::json;
+
+struct FrameSkin {
+	int sequence_number;
+	string encapsulation_type;
+	string timestamp;
+	double epoch_time;
+	double relative_time;
+	size_t size;
+	vector<string> protocols;
+};
 
 class Connection {
 	public:
@@ -33,6 +44,7 @@ class Connection {
 		int packet_count;
 		unique_ptr<ofstream> payload_file;
 		string filename;
+		vector<FrameSkin> frame_details;
 
 
 	Connection()
@@ -102,28 +114,64 @@ class Connection {
 		payload_file->flush();
 	}
 
+	void add_frame_skin(const FrameSkin &details) {
+		frame_details.push_back(details);
+	}
+
 	void print_stats(int index) const {
 		cout << "Connection " << index + 1 << ":\n"
 			 << "  Source: " << src_ip << ":" << src_port << "\n"
 			 << "  Destination: " << dest_ip << ":" << dest_port << "\n"
 			 << "  Protocol: " << protocol << "\n"
 			 << "  Packet Count: " << packet_count << "\n\n";
+
+		for (const auto &frame : frame_details) {
+			cout << "    Sequence Number: " << frame.sequence_number << "\n"
+				 << "    Encapsulation: " << frame.encapsulation_type << "\n"
+				 << "    Timestamp: " << frame.timestamp << "\n"
+				 << "    Epoch time: " << frame.epoch_time << "\n"
+				 << "    Relative time: " << frame.relative_time << "\n"
+				 << "    Size: " << frame.size << "\n"
+				 << "    Protocols: ";
+			for (const auto &proto : frame.protocols) cout << proto << " ";
+			cout << "\n";
+		}
+		cout << "\n";
 	}
 
 	json to_json() const {
+		json frames_json = json::array();
+		for (const auto &frame : frame_details) {
+			frames_json.push_back({
+				{"sequence_number", frame.sequence_number},
+				{"encapsulation_type", frame.encapsulation_type},
+				{"timestamp", frame.timestamp},
+				{"epoch_time", frame.epoch_time},
+				{"relative_time", frame.relative_time},
+				{"size", frame.size},
+				{"protocols", frame.protocols},
+			});
+		}
 		return {
 			{"src_ip", src_ip},
 			{"src_port", src_port},
 			{"dest_ip", dest_ip},
 			{"dest_port", dest_port},
 			{"protocol", protocol},
-			{"packet_count", packet_count}
+			{"packet_count", packet_count},
+			{"frames", frames_json},
 		};
 	}
 };
 
 unordered_map<string, Connection> connections;
 int running = 1; 
+chrono::high_resolution_clock::time_point program_start_time;
+
+double get_relative_time() {
+	auto now = chrono::high_resolution_clock::now();
+	return chrono::duration<double>(now - program_start_time).count();
+}
 
 void handle_signal(int signal) {
 	running = 0;
@@ -135,6 +183,21 @@ const string get_protocol(unsigned short dest_port){
 	if (dest_port == 80) { return "HTTP"; }
 	if (dest_port == 443) { return "HTTPS"; }
 	return "TCP";
+}
+
+FrameSkin generate_frames(int seq_num, const char *buffer, size_t size) {
+	FrameSkin details;
+	details.sequence_number = seq_num;
+	details.encapsulation_type = "Ethernet";
+	auto now = chrono::system_clock::now();
+	auto epoch_time = chrono::system_clock::to_time_t(now);
+	details.timestamp = ctime(&epoch_time);
+	details.epoch_time = static_cast<double>(epoch_time);
+	details.relative_time = get_relative_time();
+	details.size = size;
+
+	details.protocols = {"Ethernet", "IP", "TCP"};
+	return details;
 }
 
 string generate_conn_key(const string &src_ip, const string &dest_ip,
@@ -151,6 +214,7 @@ string generate_conn_key(const string &src_ip, const string &dest_ip,
 void add_or_update_conn(const string &src_ip, const string &dest_ip,
 		unsigned short src_port, unsigned short dest_port,
 		const string &protocol, const char* buffer, size_t data_size) {
+	static int sequence_number = 1;
 	string key = generate_conn_key(src_ip, dest_ip, src_port, dest_port);
 
 	struct iphdr *ip_header = (struct iphdr *)buffer;
@@ -161,12 +225,17 @@ void add_or_update_conn(const string &src_ip, const string &dest_ip,
 	size_t ip_header_size = ip_header->ihl * 4;
 	size_t offset = ip_header_size + tcp_header_size;
 
+	FrameSkin frame = generate_frames(sequence_number++, buffer,
+			data_size);
+
 	if (connections.find(key) != connections.end()) {
 		connections[key].increment_packet_count();
 		connections[key].store_payload(buffer, data_size, offset);
+		connections[key].add_frame_skin(frame);
 	} else if (connections.size() < MAX_CONNS) {
 		connections[key] = Connection(src_ip, dest_ip, src_port, dest_port, protocol);
 		connections[key].store_payload(buffer, data_size, offset);
+		connections[key].add_frame_skin(frame);
 	}
 }
 
