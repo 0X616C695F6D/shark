@@ -16,6 +16,8 @@
 #include <fstream>
 #include <memory>
 #include <chrono>
+#include <bitset>
+#include <sstream>
 #include "json.hpp"
 
 #define BUFFER_SIZE 65536
@@ -32,6 +34,11 @@ struct FrameSkin {
 	double relative_time;
 	size_t size;
 	vector<string> protocols;
+	string src_mac;
+	string dest_mac;
+	string ip_flags;
+	int ttl;
+	string tcp_flags;
 };
 
 class Connection {
@@ -133,6 +140,11 @@ class Connection {
 					 << "    Epoch time: " << frame.epoch_time << "\n"
 					 << "    Relative time: " << frame.relative_time << "\n"
 					 << "    Size: " << frame.size << "\n"
+					 << "    Source MAC: " << frame.src_mac << "\n"
+					 << "    Destintaion MAC: " << frame.dest_mac << "\n"
+					 << "    IP flags: " << frame.ip_flags << "\n"
+					 << "    TCP flags: " << frame.tcp_flags << "\n"
+					 << "    TTL: " << frame.ttl << "\n"
 					 << "    Protocols: ";
 				for (const auto &proto : frame.protocols) cout << proto << " ";
 				cout << "\n";
@@ -175,6 +187,35 @@ double get_relative_time() {
 	return chrono::duration<double>(now - program_start_time).count();
 }
 
+
+string get_tcp_flags(const struct tcphdr *tcp_header) {
+	string flags = "";
+	if (tcp_header->syn) flags += "SYN";
+	if (tcp_header->ack) flags += "ACK";
+	if (tcp_header->fin) flags += "FIN";
+	if (tcp_header->rst) flags += "RST";
+	if (tcp_header->psh) flags += "PSH";
+	if (tcp_header->urg) flags += "URG";
+	return flags.empty() ? "NONE" : flags;
+}
+
+string get_ip_flags(uint16_t flag_bits) {
+    std::bitset<16> flags(flag_bits);
+    return "Reserved: " + to_string(flags[15]) + ", DF: " + to_string(flags[14]) + ", MF: " + to_string(flags[13]);
+}
+
+std::string format_mac_address(const uint8_t *mac) {
+    std::ostringstream mac_stream;
+    mac_stream << std::hex << std::setfill('0')
+               << std::setw(2) << static_cast<int>(mac[0]) << ":"
+               << std::setw(2) << static_cast<int>(mac[1]) << ":"
+               << std::setw(2) << static_cast<int>(mac[2]) << ":"
+               << std::setw(2) << static_cast<int>(mac[3]) << ":"
+               << std::setw(2) << static_cast<int>(mac[4]) << ":"
+               << std::setw(2) << static_cast<int>(mac[5]);
+    return mac_stream.str();
+}
+
 void handle_signal(int signal) {
 	running = 0;
 }
@@ -197,6 +238,22 @@ FrameSkin generate_frames(int seq_num, const char *buffer, size_t size) {
 	details.epoch_time = static_cast<double>(epoch_time);
 	details.relative_time = get_relative_time();
 	details.size = size;
+
+	const uint8_t *eth_header = reinterpret_cast<const uint8_t *>(buffer);
+	details.src_mac = format_mac_address(&eth_header[6]);
+	details.dest_mac = format_mac_address(&eth_header[0]);
+
+	struct iphdr *ip_header = (struct iphdr *)(buffer + 14);
+	details.ttl = ip_header->ttl;
+	details.ip_flags = get_ip_flags(ntohs(ip_header->frag_off));
+
+	if (ip_header->protocol == IPPROTO_TCP) {
+		struct tcphdr *tcp_header = (struct tcphdr *)(buffer + 14 + ip_header->ihl * 4);
+        details.tcp_flags = get_tcp_flags(tcp_header);
+	} else {
+		details.tcp_flags = "N/A";
+	}
+
 
 	details.protocols = {"Ethernet", "IP", "TCP"};
 	return details;
