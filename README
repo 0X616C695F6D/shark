@@ -9,7 +9,9 @@ Project
   these connections: IP, TCP headers and its payload
 
 Tasks
-+
++ Frame-level details
++ TCP/IP-level details
++ Ethernet-level details
 
 Done
 + Create a connections object
