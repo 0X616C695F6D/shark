@@ -118,23 +118,25 @@ class Connection {
 		frame_details.push_back(details);
 	}
 
-	void print_stats(int index) const {
+	void print_stats(int index, bool frame_flag) const {
 		cout << "Connection " << index + 1 << ":\n"
 			 << "  Source: " << src_ip << ":" << src_port << "\n"
 			 << "  Destination: " << dest_ip << ":" << dest_port << "\n"
 			 << "  Protocol: " << protocol << "\n"
 			 << "  Packet Count: " << packet_count << "\n\n";
 
-		for (const auto &frame : frame_details) {
-			cout << "    Sequence Number: " << frame.sequence_number << "\n"
-				 << "    Encapsulation: " << frame.encapsulation_type << "\n"
-				 << "    Timestamp: " << frame.timestamp << "\n"
-				 << "    Epoch time: " << frame.epoch_time << "\n"
-				 << "    Relative time: " << frame.relative_time << "\n"
-				 << "    Size: " << frame.size << "\n"
-				 << "    Protocols: ";
-			for (const auto &proto : frame.protocols) cout << proto << " ";
-			cout << "\n";
+		if (frame_flag) {
+			for (const auto &frame : frame_details) {
+				cout << "    Sequence Number: " << frame.sequence_number << "\n"
+					 << "    Encapsulation: " << frame.encapsulation_type << "\n"
+					 << "    Timestamp: " << frame.timestamp << "\n"
+					 << "    Epoch time: " << frame.epoch_time << "\n"
+					 << "    Relative time: " << frame.relative_time << "\n"
+					 << "    Size: " << frame.size << "\n"
+					 << "    Protocols: ";
+				for (const auto &proto : frame.protocols) cout << proto << " ";
+				cout << "\n";
+			}
 		}
 		cout << "\n";
 	}
@@ -239,11 +241,11 @@ void add_or_update_conn(const string &src_ip, const string &dest_ip,
 	}
 }
 
-void print_statistics() {
+void print_statistics(bool frame_flag) {
 	// cout << "===Connection Statistics===\n";
 	int index = 0;
 	for (const auto &pair : connections) {
-		pair.second.print_stats(index++);
+		pair.second.print_stats(index++, frame_flag);
 	}
 
 }
@@ -302,6 +304,7 @@ int main(int argc, char *argv[]) {
 
 	bool dump_flag = false;
 	bool json_flag = false;
+	bool frame_flag = false;
 
 	for (int i = 1; i < argc; i++) {
 		string arg = argv[i];
@@ -309,14 +312,18 @@ int main(int argc, char *argv[]) {
 			cout << "Usage: " << argv[0] << " [options]\n";
 			cout << " -d, --dump" << "    Print TCP information\n";
 			cout << " -j, --json" << "    Write connections to JSON\n";
+			cout << " -f, --frame" << "    Print all frame details\n";
 			cout << " -h, --help" << "    Print this\n";
 			return 0;
 		}
-		else if (arg == "-d" || arg == "--dump") {
+		if (arg == "-d" || arg == "--dump") {
 			dump_flag = true;
 		}
-		else if (arg == "-j" || arg == "--json" || arg == "--JSON") {
+		if (arg == "-j" || arg == "--json" || arg == "--JSON") {
 			json_flag = true;
+		}
+		if (arg == "-f" || arg == "--frame") {
+			frame_flag = true;
 		}
 	}
 
@@ -361,7 +368,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (json_flag) { write_json(); }
-	print_statistics();
+	print_statistics(frame_flag);
 	close(sockfd);
 	return 0;
 }
